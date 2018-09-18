@@ -152,6 +152,12 @@ public class HMM {
         beta = new double[A.length][O.length];
         System.err.println("beta at start:");
         printMatrix(beta);
+        System.err.println("alpha at start of fillBeta:");
+        printMatrix(alpha);
+        System.err.println("B at start of fillBeta:");
+        printMatrix(B);
+        System.err.println("O at start of fillBeta");
+        printVector(O);
         // Last col of beta
         for (int i = 0; i < beta.length; i++) {
             beta[i][beta[0].length - 1] = 1 / colSums[O.length - 1];
@@ -160,23 +166,41 @@ public class HMM {
                 System.err.printf("colSums[O.length - 1]: %d", colSums[O.length - 1]);
                 System.exit(1);
             }
+            if(Double.isInfinite(beta[i][beta[0].length - 1])) {
+                System.err.println("beta was Infinity at middle:");
+                System.err.printf("colSums[O.length - 1]: %d", colSums[O.length - 1]);
+                System.exit(1);
+            }
 
         }
+        System.err.println("beta after filling last column:");
+        printMatrix(beta);
         for (int t = O.length - 2; t >= 0; t--) {
             for (int i = 0; i < A.length; i++) {
                 double sum = 0;
                 for (int j = 0; j < A.length; j++) {
+//                    System.err.printf("sum before add: %f\n", sum);
+  //                  System.err.printf("%f * %f * %f\n", beta[j][t + 1], B[j][O[t + 1]], A[i][j]);
                     sum += beta[j][t + 1] * B[j][O[t + 1]] * A[i][j];
+    //                System.err.printf("sum after add: %f\n", sum);
                     if(Double.isNaN(sum)){
                         System.err.println("sum was NaN");
                         System.err.printf("beta[j][t + 1], B[j][O[t + 1]], A[i][j]: %f, %f, %f\n", beta[j][t + 1], B[j][O[t + 1]], A[i][j]);
                         System.exit(1);
-                    } // TODO: check when beta becomes infinity
+                    }
                 }
+      //          System.err.printf("sum became %f\n", sum);
+                System.err.printf("Divided beta %f ", beta[i][t]);
                 beta[i][t] = sum / colSums[t];
+                System.err.printf("by colsum %f for result %f\n", colSums[t], beta[i][t]);
                 if(Double.isNaN(beta[i][t])){
                     System.err.println("beta had NaN at end:");
-                    System.err.printf("sum, colSums[t]: %f, %f", sum, colSums[t]);
+                    System.err.printf("sum, colSums[t]: %f, %f\n", sum, colSums[t]);
+                    System.exit(1);
+                }
+                if(Double.isInfinite(beta[i][t])){
+                    System.err.println("beta was infinity at end:");
+                    System.err.printf("sum, colSums[t]: %f, %f\n", sum, colSums[t]);
                     System.exit(1);
                 }
             }
