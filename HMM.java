@@ -14,7 +14,7 @@ public class HMM {
     private double[][] B;
     public double[][] pi;
     private List<int[]> O;
-    private double[][] alpha;
+    public double[][] alpha;
     private double[][] beta; // i, t
     private double[][][] digamma; // i, j, t
     private double[][] gamma; // i, t
@@ -31,13 +31,13 @@ public class HMM {
 
     public double fit(int[] O){
         estimateParams(O);
-        double newLogProb = computeLogP(O);
+        double newLogProb = computeLogP();
         int iters = 0;
         do {
             //System.err.printf("logProb: %f\n", newLogProb);
             logProb = newLogProb;
             estimateParams(O);
-            newLogProb = computeLogP(O);
+            newLogProb = computeLogP();
             iters++;
         } while(iters < maxIters && (logProb - newLogProb) < -0.00001);
         System.err.printf("Stopped after %d iterations. with pi = ", iters);
@@ -48,9 +48,9 @@ public class HMM {
         return newLogProb;
     }
 
-    public double computeLogP(int[] O) {
+    public double computeLogP() {
         double logProb = 0;
-        for(int i = 0; i < O.length; i++) {
+        for(int i = 0; i < alpha[0].length; i++) {
             logProb += Math.log(1 / colSums[i]); // Does it matter which log-base is used?
         }
         logProb = -logProb;
@@ -84,18 +84,6 @@ public class HMM {
                 A[i][j] = numer / (denom + 0.000001 * A.length);
             }
         }
-        for(int i = 0; i < A.length; i++){
-            double rowTotal = 0;
-            for(int j = 0; j < A.length; j++) {
-                rowTotal += A[i][j];
-            }
-            if(rowTotal == 1){
-                System.err.println("ROW WAS 1!");
-            }else{
-                System.err.println("ROW WAS NOT 1 in A!");
-                System.exit(1);
-            }
-        }
 
         for(int i = 0; i < A.length; i++) {
             for(int j = 0; j < B[0].length; j++) {
@@ -109,18 +97,6 @@ public class HMM {
                 }
                 numer += 0.000001;
                 B[i][j] = numer / (denom + 0.000001 * B[0].length);
-            }
-        }
-        for(int i = 0; i < A.length; i++){
-            double rowTotal = 0;
-            for(int j = 0; j < B[0].length; j++) {
-                rowTotal += B[i][j];
-            }
-            if(rowTotal == 1){
-                System.err.println("ROW WAS 1!");
-            }else{
-                System.err.println("ROW WAS NOT 1 in B!");
-                System.exit(1);
             }
         }
     }
@@ -152,17 +128,7 @@ public class HMM {
         for (int i = 1; i < O.length; i++) {
             alphaOld = extractColumn(alpha, i - 1);
             newColAlpha = matrixMul(transpose(alphaOld), A);
-            if(i == 70) {
-                System.err.println("newColAlpha:");
-                printMatrix(newColAlpha);
-            }
             newColAlpha = vectorMul(transpose(newColAlpha), extractColumn(B, O[i]));
-            if(i == 70) {
-                System.err.println("newColAlpha after multiplying with B col:");
-                printMatrix(newColAlpha);
-                System.err.println("B col:");
-                printMatrix(extractColumn(B, O[i]));
-            }
             colSum = 0;
             for(int j = 0; j < alpha.length; j++) {
                 alpha[j][i] = newColAlpha[j][0];
@@ -173,13 +139,6 @@ public class HMM {
                 colSum += alpha[j][i];
             }
             colSums[i] = colSum;
-            if(i == 70){
-                System.err.printf("colSums[70] was calculated to: %f\n", colSums[i]);
-                for(int j = 0; j < A.length; j++){
-                    System.err.printf("%f ", alpha[j][i]);
-                }
-                System.err.println("\n");
-            }
             if(Double.isNaN(colSum)){
                 System.err.printf("Encountered colSum which is NaN in column %d\n", i);
                 System.err.print("newColAlpha: ");
@@ -213,20 +172,14 @@ public class HMM {
             for (int i = 0; i < A.length; i++) {
                 double sum = 0;
                 for (int j = 0; j < A.length; j++) {
-//                    System.err.printf("sum before add: %f\n", sum);
-  //                  System.err.printf("%f * %f * %f\n", beta[j][t + 1], B[j][O[t + 1]], A[i][j]);
                     sum += beta[j][t + 1] * B[j][O[t + 1]] * A[i][j];
-    //                System.err.printf("sum after add: %f\n", sum);
                     if(Double.isNaN(sum)){
                         System.err.println("sum was NaN");
                         System.err.printf("beta[j][t + 1], B[j][O[t + 1]], A[i][j]: %f, %f, %f\n", beta[j][t + 1], B[j][O[t + 1]], A[i][j]);
                         System.exit(1);
                     }
                 }
-      //          System.err.printf("sum became %f\n", sum);
-             //   System.err.printf("Divided beta %f ", beta[i][t]);
                 beta[i][t] = sum / colSums[t];
-               // System.err.printf("by colsum %f for result %f\n", colSums[t], beta[i][t]);
                 if(Double.isNaN(beta[i][t])){
                     System.err.println("beta had NaN at end:");
                     System.err.printf("sum, colSums[t]: %f, %f\n", sum, colSums[t]);
@@ -375,7 +328,6 @@ public class HMM {
                         System.exit(1);
                     }
                 }
-
             }
         }
         for (int j = 0; j < A.length; j++) {

@@ -1,4 +1,5 @@
 // Run with  and java Main verbose > player2server < server2player
+import java.rmi.ServerError;
 import java.util.*;
 import java.lang.Integer;
 
@@ -35,13 +36,6 @@ class Player {
         if (pState.getRound() < 1) {
             return cDontShoot;
         }
-        for(int i = 0; i < 1; i++) {
-            Bird bird = pState.getBird(i);
-            for(int j = 0; j < bird.getSeqLength(); j++) {
-                System.err.printf("%d ", bird.getObservation(j));
-            }
-            System.err.println();
-        }
 
         int[][] observations = getObservations(pState);
         int[] O;
@@ -54,18 +48,13 @@ class Player {
                 for(Integer key : models.keySet()) {
                     HMM model = models.get(key);
                     model.fillAlpha(newO);
-                    scores[j][key] = model.computeLogP(newO);
-                    for (int k = 0; k < model.colSums.length; k++) {
-                        System.err.printf("%f ", model.colSums[k]);
-                    }
-                    System.err.println();
-                    System.err.printf("\nLogP: %f\n", model.computeLogP(newO));
+                    model.printMatrix(model.alpha);
+                    scores[j][key] = model.computeLogP();
                 }
             }
         }
 
         MaxScoreObj maxScoreObj = createMaxScoreObj(scores);
-        System.err.println(maxScoreObj.toString());
         return cDontShoot;
 
         // This line would predict that bird 0 will move right and shoot at it.
@@ -186,7 +175,6 @@ class Player {
         }
         List<Integer> unique = uniqueSpecies(pSpecies);
         for(int i = 0; i < unique.size(); i++) {
-            System.err.printf("%d ", unique.get(i));
             for(int j = 0; j < pState.getNumBirds(); j++){
                 //models.get(unique.get(i)).printMatrix(models.get(i).pi);
                 if(pSpecies[j] == -1){
@@ -206,18 +194,12 @@ class Player {
                         model = models.get(unique.get(i));
                         model.randomizeParams(N, M);
                     } else {
-                        System.err.println("there was already a model with pi: ");
                         model = models.get(unique.get(i));
-                        model.printMatrix(model.pi);
                     }
                     model.fit(O);
-                    System.err.println("pi from outside:");
-                    model.printMatrix(model.pi);
                 }
             }
         }
-        System.err.println();
-
     }
 
     private int[][] getObservations(GameState pState) {
