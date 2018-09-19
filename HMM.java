@@ -3,6 +3,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.Math;
+import java.rmi.ServerError;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -79,7 +80,20 @@ public class HMM {
                     numer += digamma[i][j][t];
                     denom += gamma[i][t];
                 }
-                A[i][j] = numer / denom;
+                numer += 0.000001;
+                A[i][j] = numer / (denom + 0.000001 * A.length);
+            }
+        }
+        for(int i = 0; i < A.length; i++){
+            double rowTotal = 0;
+            for(int j = 0; j < A.length; j++) {
+                rowTotal += A[i][j];
+            }
+            if(rowTotal == 1){
+                System.err.println("ROW WAS 1!");
+            }else{
+                System.err.println("ROW WAS NOT 1 in A!");
+                System.exit(1);
             }
         }
 
@@ -93,7 +107,20 @@ public class HMM {
                     }
                     denom += gamma[i][t];
                 }
-                B[i][j] = numer / denom;
+                numer += 0.000001;
+                B[i][j] = numer / (denom + 0.000001 * B[0].length);
+            }
+        }
+        for(int i = 0; i < A.length; i++){
+            double rowTotal = 0;
+            for(int j = 0; j < B[0].length; j++) {
+                rowTotal += B[i][j];
+            }
+            if(rowTotal == 1){
+                System.err.println("ROW WAS 1!");
+            }else{
+                System.err.println("ROW WAS NOT 1 in B!");
+                System.exit(1);
             }
         }
     }
@@ -121,11 +148,21 @@ public class HMM {
         normalizeCol(alpha, 0, colSum);
 
         double[][] alphaOld;
-        double[][] newColAlpha = extractColumn(alpha, 0);
+        double[][] newColAlpha;
         for (int i = 1; i < O.length; i++) {
             alphaOld = extractColumn(alpha, i - 1);
             newColAlpha = matrixMul(transpose(alphaOld), A);
+            if(i == 70) {
+                System.err.println("newColAlpha:");
+                printMatrix(newColAlpha);
+            }
             newColAlpha = vectorMul(transpose(newColAlpha), extractColumn(B, O[i]));
+            if(i == 70) {
+                System.err.println("newColAlpha after multiplying with B col:");
+                printMatrix(newColAlpha);
+                System.err.println("B col:");
+                printMatrix(extractColumn(B, O[i]));
+            }
             colSum = 0;
             for(int j = 0; j < alpha.length; j++) {
                 alpha[j][i] = newColAlpha[j][0];
@@ -136,6 +173,13 @@ public class HMM {
                 colSum += alpha[j][i];
             }
             colSums[i] = colSum;
+            if(i == 70){
+                System.err.printf("colSums[70] was calculated to: %f\n", colSums[i]);
+                for(int j = 0; j < A.length; j++){
+                    System.err.printf("%f ", alpha[j][i]);
+                }
+                System.err.println("\n");
+            }
             if(Double.isNaN(colSum)){
                 System.err.printf("Encountered colSum which is NaN in column %d\n", i);
                 System.err.print("newColAlpha: ");
@@ -150,14 +194,6 @@ public class HMM {
 
     private void fillBeta(int[] O) {
         beta = new double[A.length][O.length];
-        System.err.println("beta at start:");
-        printMatrix(beta);
-        System.err.println("alpha at start of fillBeta:");
-        printMatrix(alpha);
-        System.err.println("B at start of fillBeta:");
-        printMatrix(B);
-        System.err.println("O at start of fillBeta");
-        printVector(O);
         // Last col of beta
         for (int i = 0; i < beta.length; i++) {
             beta[i][beta[0].length - 1] = 1 / colSums[O.length - 1];
@@ -173,8 +209,6 @@ public class HMM {
             }
 
         }
-        System.err.println("beta after filling last column:");
-        printMatrix(beta);
         for (int t = O.length - 2; t >= 0; t--) {
             for (int i = 0; i < A.length; i++) {
                 double sum = 0;
@@ -190,9 +224,9 @@ public class HMM {
                     }
                 }
       //          System.err.printf("sum became %f\n", sum);
-                System.err.printf("Divided beta %f ", beta[i][t]);
+             //   System.err.printf("Divided beta %f ", beta[i][t]);
                 beta[i][t] = sum / colSums[t];
-                System.err.printf("by colsum %f for result %f\n", colSums[t], beta[i][t]);
+               // System.err.printf("by colsum %f for result %f\n", colSums[t], beta[i][t]);
                 if(Double.isNaN(beta[i][t])){
                     System.err.println("beta had NaN at end:");
                     System.err.printf("sum, colSums[t]: %f, %f\n", sum, colSums[t]);
@@ -200,11 +234,21 @@ public class HMM {
                 }
                 if(Double.isInfinite(beta[i][t])){
                     System.err.println("beta was infinity at end:");
-                    System.err.printf("sum, colSums[t]: %f, %f\n", sum, colSums[t]);
+                    System.err.printf("sum, colSums[%d]: %f, %f\n", t, sum, colSums[t]);
+                    printMatrix(alpha);
+                    printVector(colSums);
+                    System.err.printf("T: %d\n", alpha[0].length);
                     System.exit(1);
                 }
             }
         }
+    }
+
+    private void printVector(double[] v) {
+        for(int i = 0; i < v.length; i++) {
+            System.err.print(v[i] + " ");
+        }
+        System.err.println();
     }
 
     /**
@@ -407,7 +451,6 @@ public class HMM {
             }
             System.err.println();
         }
-        System.err.println();
     }
 
     public void printMatrix(int[][] m) {
