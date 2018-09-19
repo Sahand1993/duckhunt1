@@ -23,7 +23,7 @@ public class HMM {
     private double logProb;
     public double[][] delta;
     private int[][] deltaIndex;
-    private final double DEV = 0.1;
+    private final double DEV = 0.001;
 
     public HMM() {
         O = new ArrayList<>();
@@ -307,6 +307,7 @@ public class HMM {
         return state;
     }
 
+
     public class DoubleInt {
         private double max;
         private int argmax;
@@ -518,7 +519,13 @@ public class HMM {
         pi = randomMatrix(1, N);
         A = identityMatrix(N);
         B = randomMatrix(N, M);
+    }
 
+    public void initializeParamsGuess(int N, int M) {
+        pi = randomMatrix(1, N); //TODO: change to uniform
+        pi = new double[][]{{0.2, 0.2, 0.2, 0.2, 0.2}};
+        A = identityMatrix(N);
+        B = randomMatrix(N, M);
     }
 
     private double[][] identityMatrix(int n) {

@@ -1,7 +1,4 @@
 // Run with  and java Main verbose > player2server < server2player
-import jdk.jfr.Threshold;
-
-import java.rmi.ServerError;
 import java.util.*;
 import java.lang.Integer;
 
@@ -9,13 +6,13 @@ class Player {
 
     private static final int N = 5;
     private static final int M = 9;
-    private static final double SHOOT_THRESHOLD = 0.75;
-    Map<Integer, HMM> guessModels = new HashMap<>(); // Species number mapping to HMM model.
+    private static final double SHOOT_THRESHOLD = 0.6;
+    Map<Integer, HMM> models = new HashMap<>(); // Species number mapping to HMM model.
     int[][] observationsPerBird;
     HMM[] shootModels;
     int[] likeliestLastState;
     Map<Integer, MoveScore> bird2MoveScore;
-    HMM storkModel = null;
+    List<ArrayList<HMM>> speciesModels; // speciesModels[species][modelNumber]
 
     public Player() {
     }
@@ -50,6 +47,8 @@ class Player {
         // if it is after 40 timesteps
         if(pState.getBird(0).getSeqLength() < 50)
             return cDontShoot;
+
+        // TODO: duck aversion?
 
         // create 1 model per bird in game and train it on the current data
         // TODO: if not getting good results, see if we should save the models instead of creating new ones every timestep
@@ -147,7 +146,7 @@ class Player {
         double maxScore = Double.NEGATIVE_INFINITY;
         double storkScore;
         for(int i = 0; i < scores.length; i++) {
-            for(Integer j : guessModels.keySet()) {
+            for(Integer j : models.keySet()) {
                 if(scores[i][j] > maxScore) {
                     maxScore = scores[i][j];
                     rightMove = i;
@@ -155,7 +154,7 @@ class Player {
                 }
             }
         }
-        if(guessModels.containsKey(Constants.SPECIES_BLACK_STORK)) {
+        if(models.containsKey(Constants.SPECIES_BLACK_STORK)) {
             storkScore = scores[rightMove][Constants.SPECIES_BLACK_STORK];
         }else {
             storkScore = Double.NaN;
@@ -241,45 +240,45 @@ class Player {
          * Here you should write your clever algorithms to guess the species of
          * each bird. This skeleton makes no guesses, better safe than sorry!
          */
-
-
         int[] lGuess = new int[pState.getNumBirds()];
-
-        if(pState.getRound() == 0) {
-            for(int i = 0; i < pState.getNumBirds(); i++) {
-                lGuess[i] = Constants.SPECIES_RAVEN;
+        System.err.printf("round %d in guess\n", pState.getRound());
+        if(pState.getRound() == 0){
+            for(int i = 0; i < lGuess.length; i++){
+                lGuess[i] = Constants.SPECIES_PIGEON;
             }
             return lGuess;
         }
 
-        int[][] observations = getObservations(pState);
-        HMM model;
-        int[] O;
-        double newScore, maxScore;
-
-        for(int i = 0; i < pState.getNumBirds(); i++) {
-            maxScore = Double.NEGATIVE_INFINITY;
-            for(Integer species : guessModels.keySet()) {
-                model = guessModels.get(species);
-                O = observations[i];
-                O = cutIfDead(O);
-                model.fillAlpha(O);
-                newScore = model.computeLogP();
-                if (newScore > maxScore) {
-                    maxScore = newScore;
-                    System.err.printf("%d: %f\n", i, maxScore);
-                    lGuess[i] = species;
+        double logP;
+        int speciesGuess;
+        // TODO:
+        // for each bird in pState,
+        for(int i = 0; i < pState.getNumBirds(); i++){
+            // TODO: get the observation sequence of that bird
+            int[] O = new int[pState.getBird(i).getSeqLength()];
+            for(int j = 0; j < pState.getBird(i).getSeqLength(); j++){
+                int newObs = pState.getBird(i).getObservation(j);
+                if(newObs == -1)
+                    break;
+                O[j] = newObs;
+            }
+            // for each HMM in speciesModels[][], do a logP score.
+            speciesGuess = -1;
+            double maxLogP = Double.NEGATIVE_INFINITY;
+            for(int j = 0; j < speciesModels.size(); j++){ // j is the species
+                for(int k = 0; k < speciesModels.get(j).size(); k++) { // k is not interesting for the guessing
+                    speciesModels.get(j).get(k).fillAlpha(O);
+                    logP = speciesModels.get(j).get(k).computeLogP();
+                    // is this log p greater than the greatest logP?
+                    if(logP > maxLogP) {
+                        maxLogP = logP;
+                        speciesGuess = j;
+                    }
                 }
             }
+            // The highest score will get its species guessed
+            lGuess[i] = speciesGuess;
         }
-        for(int i = 0; i < lGuess.length; i++){
-            System.err.println(lGuess[i]);
-        }
-
-        for (int i = 0; i < pState.getNumBirds(); ++i) {
-            lGuess[i] = Constants.SPECIES_UNKNOWN;
-        }
-
         return lGuess;
     }
 
@@ -314,39 +313,35 @@ class Player {
      * @param pDue time before which we must have returned
      */
     public void reveal(GameState pState, int[] pSpecies, Deadline pDue) {
-        observationsPerBird = new int[pSpecies.length][pState.getBird(0).getSeqLength()];
-        System.err.printf("ROUND %d\n", pState.getRound());
+        System.err.printf("round %d in reveal\n", pState.getRound());
+        if(pState.getRound() == 0){
+            speciesModels = new ArrayList<>();
+            // add an empty list for each species
+            for(int i = 0; i < pSpecies.length; i++){
+                speciesModels.add(new ArrayList<>());
+            }
+        }
+
         for(int i = 0; i < pSpecies.length; i++) {
             System.err.printf("correct answer for guess %d: %d\n", i, pSpecies[i]);
         }
-        List<Integer> unique = uniqueSpecies(pSpecies);
-        for(int i = 0; i < unique.size(); i++) {
-            for(int j = 0; j < pState.getNumBirds(); j++){
-                //models.get(unique.get(i)).printMatrix(models.get(i).pi);
-                if(pSpecies[j] == -1){
-                    continue;
+
+        // For each bird in pSpecies
+        for(int i = 0; i < pSpecies.length; i++) {
+            // generate a new model
+            HMM model = new HMM();
+            model.initializeParamsGuess(N, M);
+            // train the model on the observation data from this round
+            if(pState.getBird(i).isAlive()) {
+                int[] O = new int[pState.getBird(i).getSeqLength()];
+                for (int j = 0; j < pState.getBird(i).getSeqLength(); j++) {
+                    O[j] = pState.getBird(i).getObservation(j);
                 }
-                if(pSpecies[j] == unique.get(i)) {
-                    // This is if the bird in pState is the same species as unique.get(i)
-                    Bird bird = pState.getBird(j);
-                    int[] O = new int[bird.getSeqLength()];
-                    for(int k = 0; k < bird.getSeqLength(); k++) {
-                        if(bird.getObservation(k) == -1)
-                            break;
-                        observationsPerBird[j][k] = bird.getObservation(k);
-                    }
-                    HMM model;
-                    // if model for species exists then fit to new observation sequence, if absent: randomize params and fit
-                    if(guessModels.get(unique.get(i)) == null) {
-                        guessModels.put(unique.get(i), new HMM());
-                        model = guessModels.get(unique.get(i));
-                        model.initializeParams(N, M);
-                    } else {
-                        model = guessModels.get(unique.get(i));
-                    }
-                    model.fit(observationsPerBird[j]);
-                }
-            }
+                model.fit(O);
+            }// TODO: should we have an else for broken observation sequences due to dead bird?
+            // add the model to speciesModels.get(species)
+            System.err.printf("pSpecies[i]: %d\n", pSpecies[i]);
+            speciesModels.get(pSpecies[i]).add(model);
         }
     }
 
