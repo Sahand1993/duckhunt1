@@ -11,19 +11,19 @@ public class HMM {
 
     public BufferedReader br;
     public double[][] A;
-    private double[][] B;
+    public double[][] B;
     public double[][] pi;
     private List<int[]> O;
     public double[][] alpha;
-    private double[][] beta; // i, t
+    public double[][] beta; // i, t
     private double[][][] digamma; // i, j, t
     private double[][] gamma; // i, t
     private int maxIters = 1000;
     public double[] colSums;
     private double logProb;
-    private double[][] delta;
+    public double[][] delta;
     private int[][] deltaIndex;
-    private final double DEV = 0.2;
+    private final double DEV = 0.1;
 
     public HMM() {
         O = new ArrayList<>();
@@ -81,12 +81,12 @@ public class HMM {
                     numer += digamma[i][j][t];
                     denom += gamma[i][t];
                 }
-                numer += 0.000001;
+                numer += 0.00001;
                 A[i][j] = numer / (denom + 0.000001 * A.length);
             }
         }
 
-        for(int i = 0; i < A.length; i++) {
+        for(int i = 0; i < B.length; i++) {
             for(int j = 0; j < B[0].length; j++) {
                 numer = 0;
                 denom = 0;
@@ -96,7 +96,7 @@ public class HMM {
                     }
                     denom += gamma[i][t];
                 }
-                numer += 0.000001;
+                numer += 0.00001;
                 B[i][j] = numer / (denom + 0.000001 * B[0].length);
             }
         }
@@ -225,7 +225,7 @@ public class HMM {
                     probs[j] = delta[j][t - 1] * A[j][i] * B[i][O[t]];
                 }
                 DoubleInt doubleInt = max(probs);
-                delta[i][t] = doubleInt.getMax();
+                delta[i][t] = doubleInt.getMax(); // TODO: add 0.000001 to avoid underflow?
                 deltaIndex[i][t] = doubleInt.getArgmax();
             }
         }
@@ -287,6 +287,24 @@ public class HMM {
             return "" + i + " ";
         }
         return backTrack(deltaIndex[i][t], t - 1) + i + " ";
+    }
+
+    /**
+     * Returns last most likely state from viterbi algorithm (delta)
+     * @return
+     */
+    public int lastState() {
+        int state = -1;
+        double maxProb = 0;
+        double newProb;
+        for(int i = 0; i < delta.length; i++) {
+            newProb = delta[i][delta[0].length - 1];
+            if(newProb > maxProb) {
+                maxProb = newProb;
+                state = i;
+            }
+        }
+        return state;
     }
 
     public class DoubleInt {
@@ -373,7 +391,7 @@ public class HMM {
         return res;
     }
 
-    public double[][] extractColumn(double[][] m, int colNo){
+    public static double[][] extractColumn(double[][] m, int colNo){
         double[][] res = new double[m.length][1];
         for(int i = 0; i < m.length; i++) {
             res[i][0] = m[i][colNo];
@@ -423,7 +441,7 @@ public class HMM {
         System.err.println();
     }
 
-    public double[][] matrixMul(double[][] a, double[][] b) {
+    public static double[][] matrixMul(double[][] a, double[][] b) {
         double[][] res = new double[a.length][b[0].length];
         for(int i = 0; i < a.length; i++) {
 

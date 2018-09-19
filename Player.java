@@ -1,4 +1,6 @@
 // Run with  and java Main verbose > player2server < server2player
+import jdk.jfr.Threshold;
+
 import java.rmi.ServerError;
 import java.util.*;
 import java.lang.Integer;
@@ -7,8 +9,13 @@ class Player {
 
     private static final int N = 5;
     private static final int M = 9;
-    Map<Integer, HMM> models = new HashMap<>(); // Species number mapping to HMM model.
+    private static final double SHOOT_THRESHOLD = 0.75;
+    Map<Integer, HMM> guessModels = new HashMap<>(); // Species number mapping to HMM model.
     int[][] observationsPerBird;
+    HMM[] shootModels;
+    int[] likeliestLastState;
+    Map<Integer, MoveScore> bird2MoveScore;
+    HMM storkModel = null;
 
     public Player() {
     }
@@ -33,46 +40,75 @@ class Player {
          * Here you should write your clever algorithms to get the best action.
          * This skeleton never shoots.
          */
-        if (pState.getRound() < 1) {
-            return cDontShoot;
-        }
 
-        int[][] observations = getObservations(pState);
-        int[] O;
-        int[] newO;
-        double[][] scores = new double[Constants.COUNT_MOVE][Constants.COUNT_SPECIES];
-        MaxScoreObj[] maxScores = new MaxScoreObj[pState.getNumBirds()];
-        for(int i = 0; i < observations.length; i++){
-            if(pState.getBird(i).isDead()){
-                maxScores[i] = new MaxScoreObj(Double.NEGATIVE_INFINITY, Double.NaN, -1, -1, -1);
-                continue;
+        // Shoot after 40 timesteps. Train one hmm per round and bird.
+        // Calculate the probability of being at each state x for each hmm at time t.
+        // Then for t+1, get the probability of each observation by taking
+        // the probability of each state times the probability of transitioning to each other
+        // state, times the probability of emitting the observation.
+
+        // if it is after 40 timesteps
+        if(pState.getBird(0).getSeqLength() < 50)
+            return cDontShoot;
+
+        // create 1 model per bird in game and train it on the current data
+        // TODO: if not getting good results, see if we should save the models instead of creating new ones every timestep
+        shootModels = new HMM[pState.getNumBirds()];
+        bird2MoveScore = new HashMap<>();
+        //likeliestLastState = new int[shootModels.length];
+        int lastState;
+        double[][] stateVector;
+        double[][] emissionVector;
+        MoveScore moveScore;
+
+        outerloop:
+        for(int i = 0; i < pState.getNumBirds(); i++) {
+
+            shootModels[i] = new HMM();
+            shootModels[i].randomizeParams(N, M); // TODO: check if this initialization is optimal for shooting. Uniform pi?
+            shootModels[i].pi = new double[][]{{0.2, 0.2, 0.2, 0.2, 0.2}};
+            int[] O = new int[pState.getBird(i).getSeqLength()];
+            for(int j = 0; j < pState.getBird(i).getSeqLength(); j++) {
+                int nextMove = pState.getBird(i).getObservation(j);
+                if(nextMove == -1) break outerloop; // if the bird is dead, we don't care about any more of its observations
+                O[j] = pState.getBird(i).getObservation(j);
             }
-            O = observations[i];
-            for(int j = 0; j < Constants.COUNT_MOVE; j++) {
-                newO = addToArray(O, j);
-                for(Integer key : models.keySet()) {
-                    HMM model = models.get(key);
-                    model.fillAlpha(newO);
-                    scores[j][key] = model.computeLogP();
+            shootModels[i].fit(O);
+            // for each model, calculate most likely state for bird with viterbi
+            shootModels[i].fillDelta(O);
+            // Get likeliest last state
+            lastState = shootModels[i].lastState();
+            // create a vector with 1 on that state and 0 everywhere else
+            stateVector = new double[1][N];
+            stateVector[0][lastState] = 1.0;
+            // multiply that vector with A to get state probabilities at next timestep.
+            stateVector = HMM.matrixMul(stateVector, shootModels[i].A);
+            // multiply the state probabilities at next timestep with B to get observation probabilities
+            emissionVector = HMM.matrixMul(stateVector, shootModels[i].B);
+            // Shoot on the first emission probability that is over 0.75.
+            double emissionProb;
+            double maxProb = 0;
+            int move = -1;
+            for(int j = 0; j < emissionVector[0].length; j++) {
+                emissionProb = emissionVector[0][j];
+                if(emissionProb > SHOOT_THRESHOLD){
+                    System.err.println("shot");
+                    return new Action(i, j);
                 }
             }
-            MaxScoreObj maxScoreObj = createMaxScoreObj(scores, i);
-            maxScores[i] = maxScoreObj;
+            // put the move and the probability in a move per bird vector and shoot on the highest score after this loop
+
         }
 
-        MaxScoreObj totalMax = max(maxScores);
-        if(totalMax.getStorkScore() > 0){
-           // System.err.printf("NOT shooting since stork score was: %f\n", totalMax.getStorkScore());
-            return cDontShoot;
-        }else if(totalMax.getSpecies() == Constants.SPECIES_BLACK_STORK){
-            //System.err.println("NOT shooting since stork gave highest probability");
-            return cDontShoot;
-        }
-        else{
-            //System.err.printf("\nshooting since stork score was: %f with logP: %f\n", totalMax.getStorkScore(), totalMax.getMaxScore() / pState.getBird(0).getSeqLength());
-            //System.err.printf("birdNo = %d and move = %d\n", totalMax.getBirdNo(), totalMax.getMove());
-            return cDontShoot; //new Action(totalMax.getBirdNo(), totalMax.getMove());
-        }
+
+
+        // create vector with 1 on that state and 0 everywhere else
+        // multiply that vector with A to get state probabilities at next timestep.
+        // multiply the state probabilities at next timestep with B to get observation probabilities
+
+        // take max out of observation probabilities vector. If it's over 0.75, shoot.
+
+        return cDontShoot;
 
 
         // This line would predict that bird 0 will move right and shoot at it.
@@ -111,7 +147,7 @@ class Player {
         double maxScore = Double.NEGATIVE_INFINITY;
         double storkScore;
         for(int i = 0; i < scores.length; i++) {
-            for(Integer j : models.keySet()) {
+            for(Integer j : guessModels.keySet()) {
                 if(scores[i][j] > maxScore) {
                     maxScore = scores[i][j];
                     rightMove = i;
@@ -119,7 +155,7 @@ class Player {
                 }
             }
         }
-        if(models.containsKey(Constants.SPECIES_BLACK_STORK)) {
+        if(guessModels.containsKey(Constants.SPECIES_BLACK_STORK)) {
             storkScore = scores[rightMove][Constants.SPECIES_BLACK_STORK];
         }else {
             storkScore = Double.NaN;
@@ -206,7 +242,9 @@ class Player {
          * each bird. This skeleton makes no guesses, better safe than sorry!
          */
 
+
         int[] lGuess = new int[pState.getNumBirds()];
+
         if(pState.getRound() == 0) {
             for(int i = 0; i < pState.getNumBirds(); i++) {
                 lGuess[i] = Constants.SPECIES_RAVEN;
@@ -221,8 +259,8 @@ class Player {
 
         for(int i = 0; i < pState.getNumBirds(); i++) {
             maxScore = Double.NEGATIVE_INFINITY;
-            for(Integer species : models.keySet()) {
-                model = models.get(species);
+            for(Integer species : guessModels.keySet()) {
+                model = guessModels.get(species);
                 O = observations[i];
                 O = cutIfDead(O);
                 model.fillAlpha(O);
@@ -230,26 +268,17 @@ class Player {
                 if (newScore > maxScore) {
                     maxScore = newScore;
                     System.err.printf("%d: %f\n", i, maxScore);
-                    if(pState.getRound() > 6){
-                        if(maxScore > -200.0) {
-                            lGuess[i] = species;
-                        }else{
-                            lGuess[i] = Constants.SPECIES_UNKNOWN;
-                        }
-                    }else{
-                        lGuess[i] = species;
-                    }
-
+                    lGuess[i] = species;
                 }
             }
         }
         for(int i = 0; i < lGuess.length; i++){
             System.err.println(lGuess[i]);
         }
-/*
+
         for (int i = 0; i < pState.getNumBirds(); ++i) {
             lGuess[i] = Constants.SPECIES_UNKNOWN;
-        }*/
+        }
 
         return lGuess;
     }
@@ -308,12 +337,12 @@ class Player {
                     }
                     HMM model;
                     // if model for species exists then fit to new observation sequence, if absent: randomize params and fit
-                    if(models.get(unique.get(i)) == null) {
-                        models.put(unique.get(i), new HMM());
-                        model = models.get(unique.get(i));
+                    if(guessModels.get(unique.get(i)) == null) {
+                        guessModels.put(unique.get(i), new HMM());
+                        model = guessModels.get(unique.get(i));
                         model.initializeParams(N, M);
                     } else {
-                        model = models.get(unique.get(i));
+                        model = guessModels.get(unique.get(i));
                     }
                     model.fit(observationsPerBird[j]);
                 }
@@ -335,4 +364,21 @@ class Player {
     }
 
     public static final Action cDontShoot = new Action(-1, -1);
+
+    private class MoveScore {
+        int move;
+        double score;
+        public MoveScore(int move, double score) {
+            this.move = move;
+            this.score = score;
+        }
+
+        public double getScore() {
+            return score;
+        }
+
+        public int getMove() {
+            return move;
+        }
+    }
 }
