@@ -8,6 +8,7 @@ class Player {
     private static final int N = 5;
     private static final int M = 9;
     Map<Integer, HMM> models = new HashMap<>(); // Species number mapping to HMM model.
+    int[][] observationsPerBird;
 
     public Player() {
     }
@@ -227,8 +228,18 @@ class Player {
                 model.fillAlpha(O);
                 newScore = model.computeLogP();
                 if (newScore > maxScore) {
-                    lGuess[i] = species;
                     maxScore = newScore;
+                    System.err.printf("%d: %f\n", i, maxScore);
+                    if(pState.getRound() > 6){
+                        if(maxScore > -200.0) {
+                            lGuess[i] = species;
+                        }else{
+                            lGuess[i] = Constants.SPECIES_UNKNOWN;
+                        }
+                    }else{
+                        lGuess[i] = species;
+                    }
+
                 }
             }
         }
@@ -274,6 +285,8 @@ class Player {
      * @param pDue time before which we must have returned
      */
     public void reveal(GameState pState, int[] pSpecies, Deadline pDue) {
+        observationsPerBird = new int[pSpecies.length][pState.getBird(0).getSeqLength()];
+        System.err.printf("ROUND %d\n", pState.getRound());
         for(int i = 0; i < pSpecies.length; i++) {
             System.err.printf("correct answer for guess %d: %d\n", i, pSpecies[i]);
         }
@@ -289,19 +302,20 @@ class Player {
                     Bird bird = pState.getBird(j);
                     int[] O = new int[bird.getSeqLength()];
                     for(int k = 0; k < bird.getSeqLength(); k++) {
-                        O[k] = bird.getObservation(k);
+                        if(bird.getObservation(k) == -1)
+                            break;
+                        observationsPerBird[j][k] = bird.getObservation(k);
                     }
-                    O = cutIfDead(O);
-                    // if model for species exists then fit to new observation sequence, if absent: randomize params and fit
                     HMM model;
+                    // if model for species exists then fit to new observation sequence, if absent: randomize params and fit
                     if(models.get(unique.get(i)) == null) {
                         models.put(unique.get(i), new HMM());
                         model = models.get(unique.get(i));
-                        model.randomizeParams(N, M);
+                        model.initializeParams(N, M);
                     } else {
                         model = models.get(unique.get(i));
                     }
-                    model.fit(O);
+                    model.fit(observationsPerBird[j]);
                 }
             }
         }

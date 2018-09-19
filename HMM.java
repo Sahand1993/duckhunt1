@@ -496,6 +496,21 @@ public class HMM {
         B = randomMatrix(N, M);
     }
 
+    public void initializeParams(int N, int M) {
+        pi = randomMatrix(1, N);
+        A = identityMatrix(N);
+        B = randomMatrix(N, M);
+
+    }
+
+    private double[][] identityMatrix(int n) {
+        double[][] res = new double[n][n];
+        for(int i = 0; i < n; i++){
+            res[i][i] = 1;
+        }
+        return res;
+    }
+
     public void addObservations(int[] OIn) {
         O.add(OIn);
     }
