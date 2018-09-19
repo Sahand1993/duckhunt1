@@ -40,11 +40,12 @@ public class HMM {
             newLogProb = computeLogP();
             iters++;
         } while(iters < maxIters && (logProb - newLogProb) < -0.00001);
-        System.err.printf("Stopped after %d iterations. with pi = ", iters);
+        /*System.err.printf("Stopped after %d iterations. with pi = ", iters);
         for(int i = 0; i < pi[0].length; i++){
             System.err.printf("%f ", pi[0][i]);
         }
         System.err.println();
+        */
         return newLogProb;
     }
 
@@ -338,7 +339,7 @@ public class HMM {
         }
     }
 
-    public void printMatrix(double[][][] m) {
+    public static void printMatrix(double[][][] m) {
         for(int t = 0; t < m[0][0].length; t++) {
             for(int i = 0; i < m.length; i++) {
                 for(int j = 0; j < m[0].length; j++){
@@ -396,7 +397,7 @@ public class HMM {
         }
         return sum;
     }
-    public void printMatrix(double[][] m){
+    public static void printMatrix(double[][] m){
         for(int i = 0; i < m.length; i++) {
             for( int j = 0; j < m[0].length; j++) {
                 System.err.printf("%2f ", m[i][j]);
@@ -405,7 +406,7 @@ public class HMM {
         }
     }
 
-    public void printMatrix(int[][] m) {
+    public static void printMatrix(int[][] m) {
         for(int i = 0; i < m.length; i++) {
             for( int j = 0; j < m[0].length; j++) {
                 System.err.print(m[i][j] + " ");
@@ -415,7 +416,7 @@ public class HMM {
         System.err.println();
     }
 
-    public void printVector(int[] v) {
+    public static void printVector(int[] v) {
         for(int i = 0; i < v.length; i++) {
             System.err.print(v[i] + " ");
         }
