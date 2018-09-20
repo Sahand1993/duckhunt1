@@ -64,7 +64,7 @@ class Player {
         for(int i = 0; i < pState.getNumBirds(); i++) {
 
             shootModels[i] = new HMM();
-            shootModels[i].randomizeParams(N, M); // TODO: check if this initialization is optimal for shooting. Uniform pi?
+            shootModels[i].randomizeParams(N, M, 0.0001); // TODO: check if this initialization is optimal for shooting. Uniform pi?
             shootModels[i].pi = new double[][]{{0.2, 0.2, 0.2, 0.2, 0.2}};
             int[] O = new int[pState.getBird(i).getSeqLength()];
             for(int j = 0; j < pState.getBird(i).getSeqLength(); j++) {
@@ -343,7 +343,7 @@ class Player {
         for(int i = 0; i < pSpecies.length; i++) {
             // generate a new model
             HMM model = new HMM();
-            model.initializeParamsGuess(N, M);
+            model.initializeParamsGuess(N, M, 0.0001); // TODO: Kolla här Shahin
             // train the model on the observation data from this round
             if(pState.getBird(i).isAlive()) {
                 int[] O = new int[pState.getBird(i).getSeqLength()];

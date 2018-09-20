@@ -488,7 +488,7 @@ public class HMM {
      * @param cols: number of columns
      * @return row-stochastic matrix
      */
-    private double[][] randomMatrix(int rows, int cols, int DEV) {
+    private double[][] randomMatrix(int rows, int cols, double DEV) {
         double[][] res = new double[rows][cols];
         double[] randomRow;
         double sum;
@@ -517,7 +517,7 @@ public class HMM {
         return fit(O);
     }
 
-    public void randomizeParams(int N, int M, int DEV) {
+    public void randomizeParams(int N, int M, double DEV) {
         // Create random pi
         pi = randomMatrix(1, N, DEV);
 
@@ -528,13 +528,13 @@ public class HMM {
         B = randomMatrix(N, M, DEV);
     }
 
-    public void initializeParams(int N, int M, int DEV) {
+    public void initializeParams(int N, int M, double DEV) {
         pi = randomMatrix(1, N, DEV);
         A = identityMatrix(N);
         B = randomMatrix(N, M, DEV);
     }
 
-    public void initializeParamsGuess(int N, int M, int DEV) {
+    public void initializeParamsGuess(int N, int M, double DEV) {
         pi = randomMatrix(1, N, DEV); //TODO: change to uniform
         pi = new double[][]{{0.2, 0.2, 0.2, 0.2, 0.2}};
         A = identityMatrix(N);
