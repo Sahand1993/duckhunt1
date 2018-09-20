@@ -541,7 +541,7 @@ public class HMM {
         B = randomMatrix(N, M, DEV);
     }
 
-    private double[][] identityMatrix(int n) {
+    public static double[][] identityMatrix(int n) {
         double[][] res = new double[n][n];
         for(int i = 0; i < n; i++){
             res[i][i] = 1;
