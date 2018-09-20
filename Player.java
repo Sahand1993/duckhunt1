@@ -6,7 +6,7 @@ class Player {
 
     private static final int N = 5;
     private static final int M = 9;
-    private static final double SHOOT_THRESHOLD = 0.6;
+    private static final double SHOOT_THRESHOLD = 0.70;
     Map<Integer, HMM> models = new HashMap<>(); // Species number mapping to HMM model.
     int[][] observationsPerBird;
     HMM[] shootModels;
@@ -45,7 +45,7 @@ class Player {
         // state, times the probability of emitting the observation.
 
         // if it is after 40 timesteps
-        if(pState.getBird(0).getSeqLength() < 50)
+        if(pState.getBird(0).getSeqLength() < 40)
             return cDontShoot;
 
         // TODO: duck aversion?
@@ -75,11 +75,18 @@ class Player {
             shootModels[i].fit(O);
             // for each model, calculate most likely state for bird with viterbi
             shootModels[i].fillDelta(O);
+            /*
             // Get likeliest last state
             lastState = shootModels[i].lastState();
-            // create a vector with 1 on that state and 0 everywhere else
+            // create a vector with 1.0 on that state and 0 everywhere else
             stateVector = new double[1][N];
             stateVector[0][lastState] = 1.0;
+            */
+            // Get last column of delta as vector.
+            stateVector = HMM.extractColumn(shootModels[i].delta, shootModels[i].delta[0].length - 1);
+            // Normalize the vector
+            stateVector = HMM.transpose(stateVector);
+            HMM.normalize(stateVector);
             // multiply that vector with A to get state probabilities at next timestep.
             stateVector = HMM.matrixMul(stateVector, shootModels[i].A);
             // multiply the state probabilities at next timestep with B to get observation probabilities
@@ -240,6 +247,7 @@ class Player {
          * Here you should write your clever algorithms to guess the species of
          * each bird. This skeleton makes no guesses, better safe than sorry!
          */
+
         int[] lGuess = new int[pState.getNumBirds()];
         System.err.printf("round %d in guess\n", pState.getRound());
         if(pState.getRound() == 0){
@@ -251,10 +259,10 @@ class Player {
 
         double logP;
         int speciesGuess;
-        // TODO:
+
         // for each bird in pState,
         for(int i = 0; i < pState.getNumBirds(); i++){
-            // TODO: get the observation sequence of that bird
+            // get the observation sequence of that bird
             int[] O = new int[pState.getBird(i).getSeqLength()];
             for(int j = 0; j < pState.getBird(i).getSeqLength(); j++){
                 int newObs = pState.getBird(i).getObservation(j);
@@ -279,6 +287,11 @@ class Player {
             // The highest score will get its species guessed
             lGuess[i] = speciesGuess;
         }
+
+        for(int i = 0; i < lGuess.length; i++){
+            lGuess[i] = Constants.SPECIES_UNKNOWN;
+        }
+
         return lGuess;
     }
 

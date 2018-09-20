@@ -29,6 +29,20 @@ public class HMM {
         O = new ArrayList<>();
     }
 
+    public static void normalize(double[][] v) {
+        double sum = 0;
+        for(int i = 0; i < v.length; i++){
+            for(int j = 0; j < v[0].length; j++) {
+                sum += v[i][j];
+            }
+        }
+        for(int i = 0; i < v.length; i++){
+            for(int j = 0; j < v[0].length; j++) {
+                v[i][j] /= sum;
+            }
+        }
+    }
+
     public double fit(int[] O){
         estimateParams(O);
         double newLogProb = computeLogP();
@@ -39,7 +53,7 @@ public class HMM {
             estimateParams(O);
             newLogProb = computeLogP();
             iters++;
-        } while(iters < maxIters && (logProb - newLogProb) < -0.00001);
+        } while(iters < maxIters && (logProb - newLogProb) < -0.000001);
         /*System.err.printf("Stopped after %d iterations. with pi = ", iters);
         for(int i = 0; i < pi[0].length; i++){
             System.err.printf("%f ", pi[0][i]);
@@ -50,7 +64,7 @@ public class HMM {
     }
 
     public double computeLogP() {
-        double logProb = 0;
+        double logProb = 0.0;
         for(int i = 0; i < alpha[0].length; i++) {
             logProb += Math.log(1 / colSums[i]); // Does it matter which log-base is used?
         }
@@ -75,28 +89,28 @@ public class HMM {
         double denom;
         for(int i = 0; i < A.length; i++) {
             for(int j = 0; j < A.length; j++) {
-                numer = 0;
-                denom = 0;
+                numer = 0.0;
+                denom = 0.0;
                 for(int t = 0; t < O.length - 1; t++) {
                     numer += digamma[i][j][t];
                     denom += gamma[i][t];
                 }
-                numer += 0.00001;
+                numer += 0.000001;
                 A[i][j] = numer / (denom + 0.000001 * A.length);
             }
         }
 
         for(int i = 0; i < B.length; i++) {
             for(int j = 0; j < B[0].length; j++) {
-                numer = 0;
-                denom = 0;
+                numer = 0.0;
+                denom = 0.0;
                 for(int t = 0; t < O.length; t++) {
                     if(O[t] == j) {
                         numer += gamma[i][t];
                     }
                     denom += gamma[i][t];
                 }
-                numer += 0.00001;
+                numer += 0.000001;
                 B[i][j] = numer / (denom + 0.000001 * B[0].length);
             }
         }
@@ -400,7 +414,7 @@ public class HMM {
         return res;
     }
 
-    public double[][] transpose(double[][] trans) {
+    public static double[][] transpose(double[][] trans) {
         double[][] res = new double[trans[0].length][trans.length];
         for (int i = 0; i < trans.length; i++) {
             for (int j = 0; j < trans[0].length; j++) {
