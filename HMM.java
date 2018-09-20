@@ -23,7 +23,6 @@ public class HMM {
     private double logProb;
     public double[][] delta;
     private int[][] deltaIndex;
-    private final double DEV = 0.001;
 
     public HMM() {
         O = new ArrayList<>();
@@ -489,7 +488,7 @@ public class HMM {
      * @param cols: number of columns
      * @return row-stochastic matrix
      */
-    private double[][] randomMatrix(int rows, int cols) {
+    private double[][] randomMatrix(int rows, int cols, int DEV) {
         double[][] res = new double[rows][cols];
         double[] randomRow;
         double sum;
@@ -518,28 +517,28 @@ public class HMM {
         return fit(O);
     }
 
-    public void randomizeParams(int N, int M) {
+    public void randomizeParams(int N, int M, int DEV) {
         // Create random pi
-        pi = randomMatrix(1, N);
+        pi = randomMatrix(1, N, DEV);
 
         // Create random A
-        A = randomMatrix(N, N);
+        A = randomMatrix(N, N, DEV);
 
         // Create random B
-        B = randomMatrix(N, M);
+        B = randomMatrix(N, M, DEV);
     }
 
-    public void initializeParams(int N, int M) {
-        pi = randomMatrix(1, N);
+    public void initializeParams(int N, int M, int DEV) {
+        pi = randomMatrix(1, N, DEV);
         A = identityMatrix(N);
-        B = randomMatrix(N, M);
+        B = randomMatrix(N, M, DEV);
     }
 
-    public void initializeParamsGuess(int N, int M) {
-        pi = randomMatrix(1, N); //TODO: change to uniform
+    public void initializeParamsGuess(int N, int M, int DEV) {
+        pi = randomMatrix(1, N, DEV); //TODO: change to uniform
         pi = new double[][]{{0.2, 0.2, 0.2, 0.2, 0.2}};
         A = identityMatrix(N);
-        B = randomMatrix(N, M);
+        B = randomMatrix(N, M, DEV);
     }
 
     private double[][] identityMatrix(int n) {
