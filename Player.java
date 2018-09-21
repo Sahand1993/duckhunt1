@@ -51,10 +51,9 @@ class Player {
         // TODO: duck aversion?
 
         // create 1 model per bird in game and train it on the current data
-        // TODO: if not getting good results, see if we should save the models instead of creating new ones every timestep
-        shootModels = new HMM[pState.getNumBirds()];
-        bird2MoveScore = new HashMap<>();
+        //bird2MoveScore = new HashMap<>();
         //likeliestLastState = new int[shootModels.length];
+        shootModels = new HMM[pState.getNumBirds()];
         int lastState;
         double[][] stateVector;
         double[][] emissionVector;
@@ -63,11 +62,10 @@ class Player {
 
         outerloop:
         for(int i = 0; i < pState.getNumBirds(); i++) {
-
             shootModels[i] = new HMM();
-            shootModels[i].randomizeParams(N, M, 0.0001); // TODO: check if this initialization is optimal for shooting. Uniform pi?
+            shootModels[i].randomizeParamsNormal(N, M, 0.1); // TODO: check if this initialization is optimal for shooting. Uniform pi?
             shootModels[i].A = HMM.identityMatrix(N);
-            shootModels[i].pi = new double[][]{{0.2, 0.2, 0.2, 0.2, 0.2}};
+//            shootModels[i].pi = new double[][]{{0.2, 0.2, 0.2, 0.2, 0.2}};
             int[] O = new int[pState.getBird(i).getSeqLength()];
             for(int j = 0; j < pState.getBird(i).getSeqLength(); j++) {
                 int nextMove = pState.getBird(i).getObservation(j);
@@ -104,23 +102,9 @@ class Player {
                     return new Action(i, j);
                 }
             }
-            // put the move and the probability in a move per bird vector and shoot on the highest score after this loop
-
+            // TODO: put the move and the probability in a move per bird vector and shoot on the highest score after this loop
         }
-
-
-
-        // create vector with 1 on that state and 0 everywhere else
-        // multiply that vector with A to get state probabilities at next timestep.
-        // multiply the state probabilities at next timestep with B to get observation probabilities
-
-        // take max out of observation probabilities vector. If it's over 0.75, shoot.
-
         return cDontShoot;
-
-
-        // This line would predict that bird 0 will move right and shoot at it.
-        // return Action(0, MOVE_RIGHT);
     }
 
     private MaxScoreObj max(MaxScoreObj[] maxScores) {
@@ -251,7 +235,7 @@ class Player {
          */
 
         int[] lGuess = new int[pState.getNumBirds()];
-        System.err.printf("round %d in guess\n", pState.getRound());
+
         if(pState.getRound() == 0){
             for(int i = 0; i < lGuess.length; i++){
                 lGuess[i] = Constants.SPECIES_PIGEON;
@@ -289,11 +273,11 @@ class Player {
             // The highest score will get its species guessed
             lGuess[i] = speciesGuess;
         }
-
+/*
         for(int i = 0; i < lGuess.length; i++){
             lGuess[i] = Constants.SPECIES_UNKNOWN;
         }
-
+*/
         return lGuess;
     }
 
@@ -328,11 +312,10 @@ class Player {
      * @param pDue time before which we must have returned
      */
     public void reveal(GameState pState, int[] pSpecies, Deadline pDue) {
-        System.err.printf("round %d in reveal\n", pState.getRound());
         if(pState.getRound() == 0){
             speciesModels = new ArrayList<>();
             // add an empty list for each species
-            for(int i = 0; i < pSpecies.length; i++){
+            for(int i = 0; i < Constants.COUNT_SPECIES; i++){
                 speciesModels.add(new ArrayList<>());
             }
         }
@@ -344,19 +327,39 @@ class Player {
         // For each bird in pSpecies
         for(int i = 0; i < pSpecies.length; i++) {
             // generate a new model
-            HMM model = new HMM();
-            model.initializeParamsGuess(N, M, 0.0001);
+            HMM model;
             // train the model on the observation data from this round
             if(pState.getBird(i).isAlive()) {
                 int[] O = new int[pState.getBird(i).getSeqLength()];
                 for (int j = 0; j < pState.getBird(i).getSeqLength(); j++) {
                     O[j] = pState.getBird(i).getObservation(j);
                 }
+                model = new HMM();
+                model.initializeParamsGuess(N, M, 0.01);
                 model.fit(O);
+                speciesModels.get(pSpecies[i]).add(model);
             }// TODO: should we have an else for broken observation sequences due to dead bird?
+            else{
+                int lastMove = 0;
+                int j = 0;
+                while(pState.getBird(i).wasAlive(j)){
+                    j++;
+                }
+                if(j < 10){
+                    return;
+                }
+                int[] O = new int[j];
+                for(int k = 0; k < O.length; k++) {
+                    O[k] = pState.getBird(i).getObservation(k);
+                }
+                model = new HMM();
+                model.initializeParamsGuess(N, M, 0.0001);
+                model.fit(O);
+                speciesModels.get(pSpecies[i]).add(model);
+            }
             // add the model to speciesModels.get(species)
             System.err.printf("pSpecies[i]: %d\n", pSpecies[i]);
-            speciesModels.get(pSpecies[i]).add(model);
+
         }
     }
 

@@ -6,6 +6,7 @@ import java.lang.Math;
 import java.rmi.ServerError;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public class HMM {
 
@@ -123,18 +124,10 @@ public class HMM {
         for (int i = 0; i < alpha.length; i++) {
             alpha[i][0] = pi[0][i] * B[i][O[0]];
             colSum += alpha[i][0];
-            if(Double.isNaN(alpha[i][0])){
-                System.err.printf("Calculated NaN in first column, alpha[%d][%d]\n", i, 0);
-                System.err.println("pi:");
-                printMatrix(pi);
-                System.exit(1);
-            }
+
         }
         colSums[0] = colSum;
-        if(Double.isNaN(colSum)){
-            System.err.println("Encountered colSum which is NaN in first column");
-            System.exit(1);
-        }
+
         normalizeCol(alpha, 0, colSum);
 
         double[][] alphaOld;
@@ -146,21 +139,9 @@ public class HMM {
             colSum = 0;
             for(int j = 0; j < alpha.length; j++) {
                 alpha[j][i] = newColAlpha[j][0];
-                if(Double.isNaN(alpha[j][i])){
-                    System.err.printf("Calculated NaN in alpha[%d][%d]\n", j, i);
-                    System.exit(1);
-                }
                 colSum += alpha[j][i];
             }
             colSums[i] = colSum;
-            if(Double.isNaN(colSum)){
-                System.err.printf("Encountered colSum which is NaN in column %d\n", i);
-                System.err.print("newColAlpha: ");
-                for(int j = 0; j < alpha.length; j++) {
-                    System.err.printf("%f ", newColAlpha[j][0]);
-                }
-                System.exit(1);
-            }
             normalizeCol(alpha, i, colSum);
         }
     }
@@ -170,16 +151,6 @@ public class HMM {
         // Last col of beta
         for (int i = 0; i < beta.length; i++) {
             beta[i][beta[0].length - 1] = 1 / colSums[O.length - 1];
-            if(Double.isNaN(beta[i][beta[0].length - 1])){
-                System.err.println("beta had NaN at middle:");
-                System.err.printf("colSums[O.length - 1]: %d", colSums[O.length - 1]);
-                System.exit(1);
-            }
-            if(Double.isInfinite(beta[i][beta[0].length - 1])) {
-                System.err.println("beta was Infinity at middle:");
-                System.err.printf("colSums[O.length - 1]: %d", colSums[O.length - 1]);
-                System.exit(1);
-            }
 
         }
         for (int t = O.length - 2; t >= 0; t--) {
@@ -187,26 +158,9 @@ public class HMM {
                 double sum = 0;
                 for (int j = 0; j < A.length; j++) {
                     sum += beta[j][t + 1] * B[j][O[t + 1]] * A[i][j];
-                    if(Double.isNaN(sum)){
-                        System.err.println("sum was NaN");
-                        System.err.printf("beta[j][t + 1], B[j][O[t + 1]], A[i][j]: %f, %f, %f\n", beta[j][t + 1], B[j][O[t + 1]], A[i][j]);
-                        System.exit(1);
-                    }
+
                 }
                 beta[i][t] = sum / colSums[t];
-                if(Double.isNaN(beta[i][t])){
-                    System.err.println("beta had NaN at end:");
-                    System.err.printf("sum, colSums[t]: %f, %f\n", sum, colSums[t]);
-                    System.exit(1);
-                }
-                if(Double.isInfinite(beta[i][t])){
-                    System.err.println("beta was infinity at end:");
-                    System.err.printf("sum, colSums[%d]: %f, %f\n", t, sum, colSums[t]);
-                    printMatrix(alpha);
-                    printVector(colSums);
-                    System.err.printf("T: %d\n", alpha[0].length);
-                    System.exit(1);
-                }
             }
         }
     }
@@ -506,17 +460,47 @@ public class HMM {
         return res;
     }
 
+    public void randomizeParamsNormal(int n, int m, double dev) {
+        System.err.println("generating pi:");
+        pi = randomNormalMatrix(1, n, dev);
+        System.err.println("generating A");
+        A = randomNormalMatrix(n, n, dev);
+        System.err.println("generating B");
+        B = randomNormalMatrix(n, m, dev);
+    }
+
+    private double[][] randomNormalMatrix(int n, int m, double dev) {
+        Random r = new Random();
+        double rowTot;
+        double[][] res = new double[n][m];
+        for(int i = 0; i < n; i++){
+            rowTot = 0.0;
+            for(int j = 0; j < m; j++) {
+                res[i][j] = 1 / m + r.nextGaussian() * dev - 0.5;
+                rowTot += res[i][j];
+            }
+            for(int j = 0; j < m; j++){
+                res[i][j] /= rowTot;
+            }
+        }
+        return res;
+    }
+
     /**
      *
      * @param N: number of hidden states
      * @param M: number of observation symbols
      */
     public double trainHMM(int N, int M, int[] O) {
-
-
         return fit(O);
     }
 
+    /**
+     *
+     * @param N
+     * @param M
+     * @param DEV
+     */
     public void randomizeParams(int N, int M, double DEV) {
         // Create random pi
         pi = randomMatrix(1, N, DEV);
