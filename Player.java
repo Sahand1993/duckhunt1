@@ -48,10 +48,7 @@ class Player {
         if(pState.getBird(0).getSeqLength() < 40)
             return cDontShoot;
 
-        // TODO: duck aversion?
-
         // create 1 model per bird in game and train it on the current data
-        //bird2MoveScore = new HashMap<>();
         //likeliestLastState = new int[shootModels.length];
         shootModels = new HMM[pState.getNumBirds()];
         int lastState;
@@ -75,13 +72,6 @@ class Player {
             shootModels[i].fit(O);
             // for each model, calculate most likely state for bird with viterbi
             shootModels[i].fillDelta(O);
-            /*
-            // Get likeliest last state
-            lastState = shootModels[i].lastState();
-            // create a vector with 1.0 on that state and 0 everywhere else
-            stateVector = new double[1][N];
-            stateVector[0][lastState] = 1.0;
-            */
             // Get last column of delta as vector.
             stateVector = HMM.extractColumn(shootModels[i].delta, shootModels[i].delta[0].length - 1);
             // Normalize the vector
@@ -102,7 +92,6 @@ class Player {
                     return new Action(i, j);
                 }
             }
-            // TODO: put the move and the probability in a move per bird vector and shoot on the highest score after this loop
         }
         return cDontShoot;
     }
@@ -217,13 +206,7 @@ class Player {
     }
 
     /**
-     * Guess the species!
-     * This function will be called at the end of each round, to give you
-     * a chance to identify the species of the birds for extra points.
-     *
-     * Fill the vector with guesses for the all birds.
-     * Use SPECIES_UNKNOWN to avoid guessing.
-     *
+
      * @param pState the GameState object with observations etc
      * @param pDue time before which we must have returned
      * @return a vector with guesses for all the birds
@@ -273,11 +256,6 @@ class Player {
             // The highest score will get its species guessed
             lGuess[i] = speciesGuess;
         }
-/*
-        for(int i = 0; i < lGuess.length; i++){
-            lGuess[i] = Constants.SPECIES_UNKNOWN;
-        }
-*/
         return lGuess;
     }
 
